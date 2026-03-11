@@ -1,0 +1,224 @@
+'active' ? '🎉' : '📭'}
+            </span>
+            <p className="todo-empty-text">
+              {filter === 'all'
+                ? 'No todos yet'
+                : filter === 'active'
+                ? 'All caught up!'
+                : 'No completed todos'}
+            </p>
+            <p className="todo-empty-sub">
+              {filter === 'all'
+                ? 'Add your first todo above'
+                : filter === 'active'
+                ? 'All todos are completed'
+                : 'Complete some todos to see them here'}
+            </p>
+          </div>
+        ) : (
+          filteredTodos.map((todo) => (
+            <TodoItem
+              key={todo.id}
+              todo={todo}
+              onToggle={handleToggle}
+              onUpdate={handleUpdate}
+              onDelete={handleDelete}
+            />
+          ))
+        )}
+      </div>
+    </>
+  );
+}
+</file>
+
+<file path="src/app/layout.tsx">
+import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Todo App',
+  description: 'A fullstack todo application built with Next.js and TypeORM',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+</file>
+
+<file path="src/app/page.tsx">
+import TodoList from '@/components/TodoList';
+
+export default function Home() {
+  return (
+    <main className="container">
+      <header className="header">
+        <h1 className="header-title">📝 Todo App</h1>
+        <p className="header-subtitle">Stay organized and get things done</p>
+      </header>
+      <TodoList />
+    </main>
+  );
+}
+</file>
+
+<file path="Dockerfile">
+# Stage 1: Install dependencies
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat python3 make g++
+WORKDIR /app
+COPY package.json ./
+RUN npm install --frozen-lockfile || npm install
+
+# Stage 2: Build the application
+FROM node:20-alpine AS builder
+RUN apk add --no-cache libc6-compat python3 make g++
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+# Stage 3: Production runner
+FROM node:20-alpine AS runner
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy built application
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
+# Create data directory for SQLite
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "server.js"]
+</file>
+
+<file path="docker-compose.yml">
+version: '3.8'
+
+services:
+  todo-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    volumes:
+      - todo-data:/app/data
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+volumes:
+  todo-data:
+</file>
+
+<file path="jest.config.ts">
+import type { Config } from 'jest';
+
+const config: Config = {
+  testEnvironment: 'jsdom',
+  transform: {
+    '^.+\\.tsx?$': ['ts-jest', {
+      tsconfig: 'tsconfig.json',
+      jsx: 'react-jsx',
+    }],
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
+  testPathIgnorePatterns: ['/node_modules/', '/.next/'],
+  setupFilesAfterSetup: [],
+};
+
+export default config;
+</file>
+
+<file path="src/__tests__/TodoItem.test.tsx">
+/**
+ * @jest-environment jsdom
+ */
+import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import TodoItem, { TodoData } from '@/components/TodoItem';
+
+// Mock window.confirm
+beforeEach(() => {
+  window.confirm = jest.fn(() => true);
+});
+
+const baseTodo: TodoData = {
+  id: 1,
+  title: 'Test Todo',
+  description: 'Test description',
+  completed: false,
+  createdAt: '2024-01-15T10:00:00.000Z',
+  updatedAt: '2024-01-15T10:00:00.000Z',
+};
+
+const noopAsync = jest.fn().mockResolvedValue(undefined);
+
+describe('TodoItem', () => {
+  it('renders the todo title', () => {
+    render(
+      <TodoItem
+        todo={baseTodo}
+        onToggle={noopAsync}
+        onUpdate={noopAsync}
+        onDelete={noopAsync}
+      />
+    );
+    expect(screen.getByText('Test Todo')).toBeInTheDocument();
+  });
+
+  it('renders the todo description', () => {
+    render(
+      <TodoItem
+        todo={baseTodo}
+        onToggle={noopAsync}
+        onUpdate={noopAsync}
+        onDelete={noopAsync}
+      />
+    );
+    expect(screen.getByText('Test description')).toBeInTheDocument();
+  });
+
+  it('renders Pending badge for incomplete todo', () => {
+    render(
+      <TodoItem
+        todo={baseTodo}
+        onToggle={noopAsync}
+        onUpdate={noopAsync}
+        onDelete={noopAsync}
+      />
+    );
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+  });
+
+  it('renders Done badge for completed todo', () => {
+    const completedTodo: TodoData = { ...baseTodo, completed: true };
+    render(
