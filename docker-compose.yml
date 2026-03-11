@@ -7,11 +7,11 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_PATH=/app/data/database.sqlite
     volumes:
       - todo-data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/todos.db
+      - NODE_ENV=production
     restart: unless-stopped
 
 volumes:

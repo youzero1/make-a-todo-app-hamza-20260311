@@ -18,40 +18,51 @@ interface TodoItemProps {
   onDelete: (id: number) => Promise<void>;
 }
 
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function TodoItem({ todo, onToggle, onUpdate, onDelete }: TodoItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(todo.title);
   const [editDescription, setEditDescription] = useState(todo.description || '');
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isToggling, setIsToggling] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const handleToggle = async () => {
-    if (isToggling) return;
-    setIsToggling(true);
+    if (toggling) return;
+    setToggling(true);
     try {
       await onToggle(todo.id, !todo.completed);
     } finally {
-      setIsToggling(false);
+      setToggling(false);
     }
   };
 
   const handleEditSave = async () => {
-    const trimmedTitle = editTitle.trim();
-    if (!trimmedTitle) {
-      setEditError('Title cannot be empty');
+    setEditError(null);
+    if (!editTitle.trim()) {
+      setEditError('Title cannot be empty.');
       return;
     }
-    setIsSaving(true);
-    setEditError(null);
+    setSaving(true);
     try {
-      await onUpdate(todo.id, trimmedTitle, editDescription.trim());
+      await onUpdate(todo.id, editTitle.trim(), editDescription.trim());
       setIsEditing(false);
-    } catch (err) {
-      setEditError(err instanceof Error ? err.message : 'Failed to save changes');
+    } catch {
+      setEditError('Failed to save changes.');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
@@ -63,109 +74,110 @@ export default function TodoItem({ todo, onToggle, onUpdate, onDelete }: TodoIte
   };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete "${todo.title}"?`)) return;
-    setIsDeleting(true);
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    setDeleting(true);
     try {
       await onDelete(todo.id);
     } finally {
-      setIsDeleting(false);
+      setDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
-  const formattedDate = new Date(todo.createdAt).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
   return (
     <div className={`todo-item${todo.completed ? ' completed' : ''}`}>
+      <div className="todo-checkbox-wrapper">
+        <input
+          type="checkbox"
+          className="todo-checkbox"
+          checked={todo.completed}
+          onChange={handleToggle}
+          disabled={toggling || deleting}
+          aria-label={`Mark "${todo.title}" as ${todo.completed ? 'incomplete' : 'complete'}`}
+        />
+      </div>
+
       {isEditing ? (
         <div className="todo-edit-form">
           {editError && (
-            <div className="error-banner">
+            <div className="error-message">
               <span>⚠️</span> {editError}
             </div>
           )}
           <input
             type="text"
+            className="form-input"
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
-            placeholder="Title"
-            disabled={isSaving}
-            maxLength={200}
+            disabled={saving}
+            placeholder="Todo title"
+            maxLength={500}
             autoFocus
           />
           <textarea
+            className="form-textarea"
             value={editDescription}
             onChange={(e) => setEditDescription(e.target.value)}
+            disabled={saving}
             placeholder="Description (optional)"
-            rows={2}
-            disabled={isSaving}
-            maxLength={1000}
           />
           <div className="todo-edit-actions">
             <button
-              className="btn btn-secondary"
-              onClick={handleEditCancel}
-              disabled={isSaving}
-            >
-              Cancel
-            </button>
-            <button
               className="btn btn-primary"
               onClick={handleEditSave}
-              disabled={isSaving || !editTitle.trim()}
+              disabled={saving || !editTitle.trim()}
             >
-              {isSaving ? 'Saving…' : 'Save'}
+              {saving ? '⏳ Saving...' : '✓ Save'}
+            </button>
+            <button
+              className="btn btn-secondary"
+              onClick={handleEditCancel}
+              disabled={saving}
+            >
+              ✕ Cancel
             </button>
           </div>
         </div>
       ) : (
-        <div className="todo-item-view">
+        <div className="todo-content">
+          <div className="todo-title">{todo.title}</div>
+          {todo.description && (
+            <div className="todo-description">{todo.description}</div>
+          )}
+          <div className="todo-meta">
+            <span className={`todo-badge ${todo.completed ? 'done' : 'pending'}`}>
+              {todo.completed ? '✓ Done' : '● Pending'}
+            </span>
+            <span className="todo-date">{formatDate(todo.createdAt)}</span>
+          </div>
+        </div>
+      )}
+
+      {!isEditing && (
+        <div className="todo-actions">
           <button
-            className={`todo-checkbox${todo.completed ? ' checked' : ''}`}
-            onClick={handleToggle}
-            disabled={isToggling}
-            title={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
-            aria-label={todo.completed ? 'Mark as incomplete' : 'Mark as complete'}
-          />
-          <div className="todo-content">
-            <div className="todo-title-row">
-              <span className={`todo-title${todo.completed ? ' completed' : ''}`}>
-                {todo.title}
-              </span>
-              {todo.completed && (
-                <span className="badge badge-success">Done</span>
-              )}
-            </div>
-            {todo.description && (
-              <div className={`todo-description${todo.completed ? ' completed' : ''}`}>
-                {todo.description}
-              </div>
-            )}
-            <div className="todo-date">Created {formattedDate}</div>
-          </div>
-          <div className="todo-actions">
-            <button
-              className="btn btn-secondary btn-icon"
-              onClick={() => { setIsEditing(true); setEditTitle(todo.title); setEditDescription(todo.description || ''); }}
-              title="Edit"
-              aria-label="Edit todo"
-              disabled={isDeleting}
-            >
-              ✏️
-            </button>
-            <button
-              className="btn btn-danger btn-icon"
-              onClick={handleDelete}
-              title="Delete"
-              aria-label="Delete todo"
-              disabled={isDeleting}
-            >
-              {isDeleting ? '…' : '🗑️'}
-            </button>
-          </div>
+            className="btn-icon edit"
+            onClick={() => setIsEditing(true)}
+            disabled={deleting}
+            title="Edit todo"
+            aria-label="Edit todo"
+          >
+            ✏️
+          </button>
+          <button
+            className="btn-icon danger"
+            onClick={handleDelete}
+            disabled={deleting}
+            title={confirmDelete ? 'Click again to confirm delete' : 'Delete todo'}
+            aria-label={confirmDelete ? 'Confirm delete' : 'Delete todo'}
+            style={confirmDelete ? { background: '#fee2e2', color: 'var(--danger)' } : {}}
+          >
+            {deleting ? '⏳' : confirmDelete ? '⁉️' : '🗑️'}
+          </button>
         </div>
       )}
     </div>

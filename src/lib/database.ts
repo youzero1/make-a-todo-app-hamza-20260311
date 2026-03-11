@@ -2,12 +2,7 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { Todo } from '@/entities/Todo';
 import path from 'path';
-
-const dbPath = process.env.DATABASE_PATH
-  ? path.isAbsolute(process.env.DATABASE_PATH)
-    ? process.env.DATABASE_PATH
-    : path.join(process.cwd(), process.env.DATABASE_PATH)
-  : path.join(process.cwd(), 'database.sqlite');
+import fs from 'fs';
 
 let dataSource: DataSource | null = null;
 
@@ -16,15 +11,30 @@ export async function getDataSource(): Promise<DataSource> {
     return dataSource;
   }
 
+  const dbPath = process.env.DATABASE_PATH || './data/todos.db';
+  const resolvedPath = path.resolve(process.cwd(), dbPath);
+  const dir = path.dirname(resolvedPath);
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   dataSource = new DataSource({
     type: 'better-sqlite3',
-    database: dbPath,
+    database: resolvedPath,
     entities: [Todo],
     synchronize: true,
     logging: false,
   });
 
-  await dataSource.initialize();
+  try {
+    await dataSource.initialize();
+    console.log('Database initialized at:', resolvedPath);
+  } catch (error) {
+    console.error('Database initialization failed:', error);
+    throw error;
+  }
+
   return dataSource;
 }
 

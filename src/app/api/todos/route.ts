@@ -1,7 +1,8 @@
+import 'reflect-metadata';
 import { NextRequest, NextResponse } from 'next/server';
 import { getTodoRepository } from '@/lib/database';
 
-export async function GET(): Promise<NextResponse> {
+export async function GET() {
   try {
     const repo = await getTodoRepository();
     const todos = await repo.find({
@@ -17,21 +18,35 @@ export async function GET(): Promise<NextResponse> {
   }
 }
 
-export async function POST(request: NextRequest): Promise<NextResponse> {
+export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as { title?: string; description?: string };
+    const body: unknown = await request.json();
 
-    if (!body.title || body.title.trim() === '') {
+    if (
+      typeof body !== 'object' ||
+      body === null ||
+      !('title' in body) ||
+      typeof (body as Record<string, unknown>).title !== 'string'
+    ) {
       return NextResponse.json(
-        { error: 'Title is required' },
+        { error: 'Title is required and must be a string' },
+        { status: 400 }
+      );
+    }
+
+    const { title, description } = body as { title: string; description?: string };
+
+    if (!title.trim()) {
+      return NextResponse.json(
+        { error: 'Title cannot be empty' },
         { status: 400 }
       );
     }
 
     const repo = await getTodoRepository();
     const todo = repo.create({
-      title: body.title.trim(),
-      description: body.description?.trim() || null,
+      title: title.trim(),
+      description: description?.trim() || null,
       completed: false,
     });
 

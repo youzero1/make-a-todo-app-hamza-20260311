@@ -1,23 +1,20 @@
+import 'reflect-metadata';
 import { NextRequest, NextResponse } from 'next/server';
 import { getTodoRepository } from '@/lib/database';
 
 type RouteParams = { params: { id: string } };
 
-export async function PUT(
-  request: NextRequest,
-  { params }: RouteParams
-): Promise<NextResponse> {
+export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) {
       return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
-    const body = await request.json() as {
-      title?: string;
-      description?: string;
-      completed?: boolean;
-    };
+    const body: unknown = await request.json();
+    if (typeof body !== 'object' || body === null) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
     const repo = await getTodoRepository();
     const todo = await repo.findOne({ where: { id } });
@@ -26,26 +23,38 @@ export async function PUT(
       return NextResponse.json({ error: 'Todo not found' }, { status: 404 });
     }
 
-    if (body.title !== undefined) {
-      if (body.title.trim() === '') {
+    const updates = body as Record<string, unknown>;
+
+    if ('title' in updates) {
+      if (typeof updates.title !== 'string' || !updates.title.trim()) {
         return NextResponse.json(
-          { error: 'Title cannot be empty' },
+          { error: 'Title must be a non-empty string' },
           { status: 400 }
         );
       }
-      todo.title = body.title.trim();
+      todo.title = updates.title.trim();
     }
 
-    if (body.description !== undefined) {
-      todo.description = body.description.trim() || null;
+    if ('description' in updates) {
+      if (updates.description === null || updates.description === undefined) {
+        todo.description = null;
+      } else if (typeof updates.description === 'string') {
+        todo.description = updates.description.trim() || null;
+      }
     }
 
-    if (body.completed !== undefined) {
-      todo.completed = body.completed;
+    if ('completed' in updates) {
+      if (typeof updates.completed !== 'boolean') {
+        return NextResponse.json(
+          { error: 'Completed must be a boolean' },
+          { status: 400 }
+        );
+      }
+      todo.completed = updates.completed;
     }
 
-    const updated = await repo.save(todo);
-    return NextResponse.json(updated, { status: 200 });
+    const saved = await repo.save(todo);
+    return NextResponse.json(saved, { status: 200 });
   } catch (error) {
     console.error('PUT /api/todos/[id] error:', error);
     return NextResponse.json(
@@ -55,10 +64,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: RouteParams
-): Promise<NextResponse> {
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
     const id = parseInt(params.id, 10);
     if (isNaN(id)) {

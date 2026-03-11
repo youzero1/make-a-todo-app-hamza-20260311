@@ -9,61 +9,65 @@ interface TodoFormProps {
 export default function TodoForm({ onAdd }: TodoFormProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      setError('Title is required');
+    setError(null);
+
+    if (!title.trim()) {
+      setError('Title is required.');
       return;
     }
 
-    setIsSubmitting(true);
-    setError(null);
+    setLoading(true);
     try {
-      await onAdd(trimmedTitle, description.trim());
+      await onAdd(title.trim(), description.trim());
       setTitle('');
       setDescription('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add todo');
+    } catch {
+      setError('Failed to add todo. Please try again.');
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="form-card">
-      <h2>Add New Todo</h2>
+    <div className="card">
+      <h2 className="form-title">✨ Add New Todo</h2>
       {error && (
-        <div className="error-banner">
+        <div className="error-message">
           <span>⚠️</span> {error}
         </div>
       )}
       <form onSubmit={handleSubmit}>
         <div className="form-group">
-          <label htmlFor="title">Title <span style={{ color: 'var(--danger)' }}>*</span></label>
+          <label htmlFor="todo-title" className="form-label">
+            Title <span style={{ color: 'var(--danger)' }}>*</span>
+          </label>
           <input
-            id="title"
+            id="todo-title"
             type="text"
+            className="form-input"
+            placeholder="What needs to be done?"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="What needs to be done?"
-            disabled={isSubmitting}
-            maxLength={200}
+            disabled={loading}
+            maxLength={500}
           />
         </div>
         <div className="form-group">
-          <label htmlFor="description">Description <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>(optional)</span></label>
+          <label htmlFor="todo-description" className="form-label">
+            Description <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+          </label>
           <textarea
-            id="description"
+            id="todo-description"
+            className="form-textarea"
+            placeholder="Add more details..."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add more details..."
-            rows={2}
-            disabled={isSubmitting}
-            maxLength={1000}
+            disabled={loading}
           />
         </div>
         <div className="form-actions">
@@ -71,16 +75,16 @@ export default function TodoForm({ onAdd }: TodoFormProps) {
             type="button"
             className="btn btn-secondary"
             onClick={() => { setTitle(''); setDescription(''); setError(null); }}
-            disabled={isSubmitting || (!title && !description)}
+            disabled={loading || (!title && !description)}
           >
             Clear
           </button>
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={isSubmitting || !title.trim()}
+            disabled={loading || !title.trim()}
           >
-            {isSubmitting ? 'Adding…' : '+ Add Todo'}
+            {loading ? '⏳ Adding...' : '+ Add Todo'}
           </button>
         </div>
       </form>

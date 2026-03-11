@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['typeorm', 'better-sqlite3'],
+    serverComponentsExternalPackages: ['typeorm', 'better-sqlite3', 'reflect-metadata'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
