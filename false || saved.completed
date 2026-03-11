@@ -1,0 +1,5 @@
+undefined).toBeTruthy();
+  });
+
+  it('should handle findOne returning null for non-existent id', async () => {
+    const found
